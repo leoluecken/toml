@@ -3,6 +3,10 @@ import re
 import sys
 from decimal import Decimal
 
+import importlib.util
+if importlib.util.find_spec("numpy") is not None:
+    import numpy
+
 from toml.decoder import InlineTableDict
 
 if sys.version_info >= (3,):
@@ -173,9 +177,15 @@ class TomlEncoder(object):
 
     def dump_value(self, v):
         # Lookup function corresponding to v's type
-        dump_fn = next((f for t, f in self.dump_funcs.items() if isinstance(v, t)), None)
-        if dump_fn is None and hasattr(v, '__iter__'):
-            dump_fn = self.dump_funcs[list]
+        dump_fn = self.dump_funcs.get(type(v))
+        if dump_fn is None:
+            if hasattr(v, '__iter__'):
+                dump_fn = self.dump_funcs[list]
+            elif "numpy" in sys.modules:
+                if isinstance(v, numpy.integer):
+                    dump_fn = self.dump_funcs.get(int)
+                elif isinstance(v, numpy.floating):
+                    dump_fn = self.dump_funcs.get(float)
         # Evaluate function (if it exists) else return v
         return dump_fn(v) if dump_fn is not None else self.dump_funcs[str](v)
 
